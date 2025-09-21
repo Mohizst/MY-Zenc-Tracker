@@ -1,0 +1,235 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ZEN TRACKER</title>
+<link rel="stylesheet" href="style.css">
+
+<!-- کتابخانه ethers.js -->
+<script src="https://cdn.jsdelivr.net/npm/ethers@6.9.0/dist/ethers.min.js"></script>
+<!-- Web3Modal -->
+<script src="https://unpkg.com/@walletconnect/web3-provider"></script>
+<script src="https://unpkg.com/web3modal"></script>
+</head>
+
+<body>
+<div class="banner">
+    <div class="navbar">
+        <button id="connectBtn">Connect Wallet</button>
+    </div>
+
+    <div class="container">
+        <h1>MY ZEN TRACKER</h1>
+
+        <div class="animation">
+            <img src="./Pic/plate.svg" class="plate">
+            <div class="time">
+                <img src="./Pic/time.svg" class="time2">
+                <img src="./Pic/Z1.png" class="icon">
+            </div>
+            <div class="circle">
+                <img src="./Pic/Colck 3.svg" class="c3">
+                <img src="./Pic/Colck 2.svg" class="c2">
+                <img src="./Pic/Colck 1.svg" class="c1">
+            </div>
+        </div>
+
+        <div class="part2">
+            <div class="item">
+                <span class="ziro" id="walletStatus">0</span>
+                <span class="text">Wallet</span>
+            </div>
+            <div class="item">
+                <span class="ziro" id="transactionCount">0</span>
+                <span class="text">Transaction</span>
+            </div>
+            <div class="item">
+                <span class="ziro" id="progressCount">0/1</span>
+                <span class="text">Progress</span>
+            </div>
+            <div class="item">
+                <span class="ziro" id="checkinCount">0</span>
+                <span class="text">Check-in</span>
+            </div>
+        </div>
+
+        <div class="tasks">
+            <div class="task">
+                <span class="task-text">Follow on X</span>
+                <button class="btn follow">Follow</button>
+            </div>
+
+            <div class="task">
+                <span class="task-text">Check-in</span>
+                <button class="btn checkin-btn">Check-in</button>
+                <span id="checkinTimer" style="margin-left:10px;color:#5f5f5f;">Ready</span>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div id="myText">created by MOHIS</div>
+
+<script>
+document.addEventListener("DOMContentLoaded", async () => {
+    const walletStatus = document.getElementById("walletStatus");
+    const transactionCountEl = document.getElementById("transactionCount");
+    const progressEl = document.getElementById("progressCount");
+    const checkinCountEl = document.getElementById("checkinCount");
+    const checkinTimer = document.getElementById("checkinTimer");
+
+    const followBtn = document.querySelector(".btn.follow");
+    const checkinBtn = document.querySelector(".btn.checkin-btn");
+
+    let followDone = false;
+    let checkinDone = false;
+
+    // ======= Wallet Connect =======
+    const providerOptions = {
+        walletconnect: {
+            package: window.WalletConnectProvider.default,
+            options: {
+                infuraId: "460f40a260564ac4a4f4b3fffb032dad",
+            }
+        }
+    };
+
+    const web3Modal = new window.Web3Modal.default({
+        cacheProvider: false,
+        providerOptions,
+        theme: "dark"
+    });
+
+    const connectBtn = document.getElementById("connectBtn");
+
+    connectBtn.addEventListener("click", async () => {
+        try {
+            const instance = await web3Modal.connect();
+            const provider = new ethers.providers.Web3Provider(instance);
+            const signer = provider.getSigner();
+            const address = await signer.getAddress();
+            console.log("Connected:", address);
+            connectBtn.textContent = `Connected: ${address.slice(0, 6)}...${address.slice(-4)}`;
+
+            // Wallet به 1 تغییر می‌کند
+            if(walletStatus.textContent === "0") walletStatus.textContent = "1";
+
+            // ===== Transaction با API زنچین =====
+            try {
+                const zenApiUrl = `https://zenchain-testnet.api.onfinality.io/public`;
+                const zenProvider = new ethers.JsonRpcProvider(zenApiUrl);
+                const txCount = await zenProvider.getTransactionCount(address);
+                transactionCountEl.textContent = txCount;
+            } catch(err) {
+                console.error("خطا در دریافت تعداد تراکنش‌ها از API زنچین:", err);
+            }
+
+        } catch (error) {
+            console.error("Connection failed", error);
+        }
+    });
+
+    // ======= Follow Button =======
+    followBtn.addEventListener("click", () => {
+        window.open("https://x.com/Mrmohiz", "_blank");
+
+        const task = followBtn.closest(".task");
+        followBtn.remove();
+        const check = document.createElement("span");
+        check.textContent = "✔";
+        check.style.color = "green";
+        check.style.fontWeight = "bold";
+        task.appendChild(check);
+
+        followDone = true;
+        updateProgress();
+    });
+
+    // ======= Check-in Button & Timer =======
+    function updateCheckinTimer() {
+        let lastCheckin = localStorage.getItem("lastCheckin");
+        if (!lastCheckin) {
+            checkinTimer.textContent = "Ready";
+            checkinBtn.disabled = false;
+            return;
+        }
+
+        lastCheckin = parseInt(lastCheckin);
+        if (isNaN(lastCheckin)) {
+            checkinTimer.textContent = "Ready";
+            checkinBtn.disabled = false;
+            localStorage.removeItem("lastCheckin");
+            return;
+        }
+
+        const now = new Date().getTime();
+        let diff = 24*60*60*1000 - (now - lastCheckin);
+
+        if (diff <= 0) {
+            checkinTimer.textContent = "Ready";
+            checkinBtn.disabled = false;
+            localStorage.removeItem("lastCheckin");
+            checkinDone = false;
+        } else {
+            const hours = Math.floor(diff / (1000*60*60));
+            const minutes = Math.floor((diff % (1000*60*60)) / (1000*60));
+            const seconds = Math.floor((diff % (1000*60)) / 1000);
+
+            const h = hours.toString().padStart(2,'0');
+            const m = minutes.toString().padStart(2,'0');
+            const s = seconds.toString().padStart(2,'0');
+
+            checkinTimer.textContent = `${h}:${m}:${s}`;
+            checkinBtn.disabled = true;
+        }
+    }
+
+    checkinBtn.addEventListener("click", () => {
+        const now = new Date().getTime();
+        localStorage.setItem("lastCheckin", now);
+
+        // تعداد Check-in ها افزایش پیدا می‌کنه
+        let count = parseInt(localStorage.getItem("checkinCount") || "0");
+        count += 1;
+        localStorage.setItem("checkinCount", count);
+        checkinCountEl.textContent = count;
+
+        checkinDone = true;
+        updateProgress();
+        updateCheckinTimer();
+    });
+
+    // تایمر هر ثانیه آپدیت می‌شود
+    setInterval(updateCheckinTimer, 1000);
+    updateCheckinTimer();
+
+    function updateProgress() {
+        let completed = 0;
+        if(followDone) completed++;
+        if(checkinDone) completed++;
+        progressEl.textContent = `${completed}/2`;
+
+        if(walletStatus.textContent === "0") walletStatus.textContent = "1";
+    }
+
+    // مقدار اولیه Check-in
+    checkinCountEl.textContent = localStorage.getItem("checkinCount") || "0";
+});
+</script>
+
+<style>
+#myText {
+    position: absolute;
+    top: 650px;
+    left: 1350px;
+    font-family: Verdana, Geneva, Tahoma, sans-serif;
+    font-size: 15px;
+    color: rgb(0, 0, 0);
+    user-select: none;
+}
+</style>
+
+</body>
+</html>
